@@ -16,7 +16,31 @@ $("register").onclick=async()=>{try{$("err").textContent="";const c=await create
 $("logout").onclick=()=>signOut(auth);
 onAuthStateChanged(auth,async u=>{me=u;$("authwrap").hidden=!!u;$("app").hidden=!u;if(u){await setDoc(doc(db,"users",u.uid),{uid:u.uid,email:u.email},{merge:true});watchChats()}else{if(stopList)stopList();if(stopMessages)stopMessages()}});
 function watchChats(){stopList=onSnapshot(query(collection(db,"chats"),where("members","array-contains",me.uid)),s=>{const box=$("chatlist");box.innerHTML="";s.forEach(d=>{const c=d.data(),other=(c.memberEmails||[]).find(e=>e!==me.email)||"Чат",el=document.createElement("div");el.className="chat";el.textContent=other+" — "+(c.lastMessage||"Начните общение");el.onclick=()=>openChat(d.id,other);box.append(el)})},e=>alert(e.message))}
-async function newChat(){const email=prompt("Введи точную почту другого пользователя VirtGram:");if(!email)return;const q=query(collection(db,"users"),where("email","==",email.trim().toLowerCase())),res=await getDocs(q);if(res.empty){alert("Пользователь не найден. Сначала он должен зарегистрироваться.");return}let target;res.forEach(x=>target=x.data());if(target.uid===me.uid){alert("Нельзя создать чат с самим собой.");return}const members=[me.uid,target.uid].sort(),id=members.join("_");await setDoc(doc(db,"chats",id),{members,memberEmails:[me.email,target.email],lastMessage:"",createdAt:serverTimestamp()},{merge:true});openChat(id,target.email)}
+async function newChat(){
+  const email=prompt("Введи точную почту другого пользователя VirtGram:");
+  if(!email)return;
+  const q=query(collection(db,"users"),where("email","==",email.trim().toLowerCase()));
+  const res=await getDocs(q);
+  if(res.empty){
+    alert("Пользователь не найден.\nСначала он должен зарегистрироваться.");
+    return;
+  }
+  let target;
+  res.forEach(x=>target=x.data());
+  if(target.uid===me.uid){
+    alert("Нельзя создать чат с самим собой.");
+    return;
+  }
+  const members=[me.uid,target.uid].sort();
+  const id=members.join("_");
+  await setDoc(doc(db,"chats",id),{
+    members,
+    memberEmails:[me.email,target.email],
+    lastMessage:"",
+    createdAt:serverTimestamp()
+  },{merge:true});
+  openChat(id,target.email);
+}
 async function openChat(id,title){if(stopMessages)stopMessages();$("app").classList.add("show-chat");$("main").innerHTML='<div class="header"><b></b></div><div class="messages" id="msgs"></div><form class="composer" id="form"><input id="msg" placeholder="Сообщение..." maxlength="2000"><button class="send">➤</button></form>';$("main").querySelector("b").textContent=title;stopMessages=onSnapshot(query(collection(db,"chats",id,"messages"),orderBy("createdAt","asc")),s=>{const box=$("msgs");box.innerHTML="";s.forEach(d=>{const m=d.data(),el=document.createElement("div");el.className="bubble"+(m.senderId===me.uid?" mine":"");el.textContent=m.text;box.append(el)});box.scrollTop=box.scrollHeight},e=>alert(e.message));$("form").onsubmit=async e=>{e.preventDefault();const input=$("msg"),text=input.value.trim();if(!text)return;input.value="";try{await addDoc(collection(db,"chats",id,"messages"),{text,senderId:me.uid,createdAt:serverTimestamp()});await setDoc(doc(db,"chats",id),{lastMessage:text,updatedAt:serverTimestamp()},{merge:true})}catch(err){alert(err.message)}}}
 $("new").onclick=()=>newChat().catch(e=>alert(e.message));$("search").oninput=()=>{const v=$("search").value.toLowerCase();[...$("chatlist").children].forEach(x=>x.style.display=x.textContent.toLowerCase().includes(v)?"block":"none")};
 </script></body></html>
